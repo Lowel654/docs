@@ -1,17 +1,77 @@
-export const ArgsTable = ({ data, name }) => {
-    // Helper function to represent GraphQL type
-    const getTypeString = (typeStructure) => {
-        if (!typeStructure) return ''
-        if (typeStructure.kind === 'NON_NULL') {
-            return `${getTypeString(typeStructure.ofType)}!`;
-        } else if (typeStructure.kind === 'LIST') {
-            return `[${getTypeString(typeStructure.ofType)}]`;
-        } else if (['OBJECT', 'SCALAR', 'ENUM'].includes(typeStructure.kind)) {
-            return `${typeStructure.name}${getTypeString(typeStructure.ofType)}`;
-        } else {
-            return '';
+/* ── Shared constants & helpers ────────────────────────────────────── */
+
+const METADATA_URL = 'https://metadata.cloud.getdbt.com/graphql'
+const METADATA_BETA_URL = 'https://metadata.cloud.getdbt.com/beta/graphql'
+
+const getMetadataUrl = (useBetaAPI) =>
+  useBetaAPI ? METADATA_BETA_URL : METADATA_URL
+
+const getTypeString = (typeStructure) => {
+  if (!typeStructure) return ''
+  if (typeStructure.kind === 'NON_NULL') {
+    return `${getTypeString(typeStructure.ofType)}!`;
+  } else if (typeStructure.kind === 'LIST') {
+    return `[${getTypeString(typeStructure.ofType)}]`;
+  } else if (['OBJECT', 'SCALAR', 'ENUM'].includes(typeStructure.kind)) {
+    return `${typeStructure.name}${getTypeString(typeStructure.ofType)}`;
+  } else {
+    return '';
+  }
+};
+
+const TYPE_REF_FRAGMENT = `
+  fragment TypeRef on __Type {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
         }
-    };
+      }
+    }
+  }`;
+
+const LoadingIndicator = () => <h1>Fetching data...</h1>
+
+const useGraphQLData = (useBetaAPI, query) => {
+  const [data, setData] = useState(null)
+  useEffect(() => {
+    fetch(getMetadataUrl(useBetaAPI), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    })
+      .then((result) => result.json())
+      .then((data) => setData(data))
+  }, [])
+  return data
+}
+
+/* ── Components ───────────────────────────────────────────────────── */
+
+export const ArgsTable = ({ data, name }) => {
   return (
     <table>
       <thead>
@@ -40,10 +100,7 @@ export const ArgsTable = ({ data, name }) => {
 
 
 export const QueryArgsTable = ({ queryName, useBetaAPI }) => {
-    const metadataUrl = 'https://metadata.cloud.getdbt.com/graphql'
-    const metadataBetaUrl = 'https://metadata.cloud.getdbt.com/beta/graphql'
-
-    const queryArgsQuery = `{
+  const query = `{
     __schema {
         queryType {
         fields(includeDeprecated: true) {
@@ -68,21 +125,9 @@ export const QueryArgsTable = ({ queryName, useBetaAPI }) => {
         }
     }
     }`
-  const [data, setData] = useState(null)
-  useEffect(() => {
-    const fetchData = () => {
-      fetch(useBetaAPI ? metadataBetaUrl : metadataUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: queryArgsQuery }),
-      })
-        .then((result) => result.json())
-        .then((data) => setData(data))
-    }
-    fetchData()
-  }, [])
+  const data = useGraphQLData(useBetaAPI, query)
   if (!data) {
-    return <h1>Fetching data...</h1>
+    return <LoadingIndicator />
   }
   return (
     <ArgsTable name={queryName} data={data.data.__schema.queryType} />
@@ -90,80 +135,35 @@ export const QueryArgsTable = ({ queryName, useBetaAPI }) => {
 }
 
 export const NodeArgsTable = ({ parent, name, useBetaAPI }) => {
-  const [data, setData] = useState(null)
-  const metadataUrl = 'https://metadata.cloud.getdbt.com/graphql'
-  const metadataBetaUrl = 'https://metadata.cloud.getdbt.com/beta/graphql'
-  useEffect(() => {
-    const fetchData = () => {
-      fetch(useBetaAPI ? metadataBetaUrl : metadataUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: `
-          query {
-            __type(name: "${parent}") {
-              ...FullType
-            }
-          }
-
-          fragment FullType on __Type {
-            kind
-            fields(includeDeprecated: true) {
-              name
-              description
-              args {
-                name
-                description
-                defaultValue
-                type {
-                  ...TypeRef
-                }
-              }
-            }
-          }
-
-          # get several levels
-          fragment TypeRef on __Type {
-            kind
-            name
-            ofType {
-              kind
-              name
-              ofType {
-                kind
-                name
-                ofType {
-                  kind
-                  name
-                  ofType {
-                    kind
-                    name
-                    ofType {
-                      kind
-                      name
-                      ofType {
-                        kind
-                        name
-                        ofType {
-                          kind
-                          name
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        `})
-      })
-        .then((result) => result.json())
-        .then((data) => setData(data))
+  const query = `
+    query {
+      __type(name: "${parent}") {
+        ...FullType
+      }
     }
-    fetchData()
-  }, [])
+
+    fragment FullType on __Type {
+      kind
+      fields(includeDeprecated: true) {
+        name
+        description
+        args {
+          name
+          description
+          defaultValue
+          type {
+            ...TypeRef
+          }
+        }
+      }
+    }
+
+    # get several levels
+    ${TYPE_REF_FRAGMENT}
+  `
+  const data = useGraphQLData(useBetaAPI, query)
   if (!data) {
-    return <h1>Fetching data...</h1>
+    return <LoadingIndicator />
   }
   return (
     <ArgsTable name={name} data={data.data.__type} />
@@ -171,89 +171,32 @@ export const NodeArgsTable = ({ parent, name, useBetaAPI }) => {
 }
 
 export const SchemaTable = ({ nodeName, useBetaAPI, exclude = [] }) => {
-  const [data, setData] = useState(null)
-  const getTypeString = (typeStructure) => {
-        if (!typeStructure) return ''
-        if (typeStructure.kind === 'NON_NULL') {
-            return `${getTypeString(typeStructure.ofType)}!`;
-        } else if (typeStructure.kind === 'LIST') {
-            return `[${getTypeString(typeStructure.ofType)}]`;
-        } else if (['OBJECT', 'SCALAR', 'ENUM'].includes(typeStructure.kind)) {
-            return `${typeStructure.name}${getTypeString(typeStructure.ofType)}`;
-        } else {
-            return '';
-        }
-    };
-  const metadataUrl = 'https://metadata.cloud.getdbt.com/graphql'
-const metadataBetaUrl = 'https://metadata.cloud.getdbt.com/beta/graphql'
-  useEffect(() => {
-    const fetchData = () => {
-      fetch(useBetaAPI ? metadataBetaUrl : metadataUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: `
-          query {
-            __type(name: "${nodeName}") {
-              ...FullType
-            }
-          }
-
-          fragment FullType on __Type {
-            kind
-            name
-            description
-            fields(includeDeprecated: true) {
-              name
-              description
-              type {
-                ...TypeRef
-              }
-            }
-          }
-
-          # get several levels
-          fragment TypeRef on __Type {
-            kind
-            name
-            ofType {
-              kind
-              name
-              ofType {
-                kind
-                name
-                ofType {
-                  kind
-                  name
-                  ofType {
-                    kind
-                    name
-                    ofType {
-                      kind
-                      name
-                      ofType {
-                        kind
-                        name
-                        ofType {
-                          kind
-                          name
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        `}),
-      })
-        .then((result) => result.json())
-        .then((data) => setData(data))
+  const query = `
+    query {
+      __type(name: "${nodeName}") {
+        ...FullType
+      }
     }
-    fetchData()
-  }, [])
+
+    fragment FullType on __Type {
+      kind
+      name
+      description
+      fields(includeDeprecated: true) {
+        name
+        description
+        type {
+          ...TypeRef
+        }
+      }
+    }
+
+    # get several levels
+    ${TYPE_REF_FRAGMENT}
+  `
+  const data = useGraphQLData(useBetaAPI, query)
   if (!data) {
-    return <h1>Fetching data...</h1>
+    return <LoadingIndicator />
   }
   return (
     <table>

@@ -1,3 +1,57 @@
+/* ── Shared primitives ─────────────────────────────────────────────── */
+
+const ArrowIcon = ({ className = "w-5 h-5" }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    strokeWidth="1.5"
+    className={className}
+    fill="none"
+  >
+    <path
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+    />
+  </svg>
+);
+
+const IconCard = ({ href, external, icon, title, desc, className = "" }) => (
+  <a
+    href={href}
+    rel={external ? "noopener noreferrer" : undefined}
+    className={`
+      group relative flex items-start gap-4
+      px-4 pt-5 pb-4
+      border border-black/15 dark:border-white/15
+      transition-all duration-300
+      hover:!bg-[#476520] hover:!border-[#476520]
+      hover:no-underline
+      min-h-[104px]
+      ${className}
+    `}
+  >
+    <img
+      src={icon}
+      alt=""
+      className="
+        w-10 h-10 shrink-0
+        transition duration-300
+        group-hover:invert group-hover:brightness-0 group-hover:contrast-200
+      "
+    />
+    <div className="pr-2">
+      <h4 className="font-bold text-gray-900 dark:text-yellow-300 group-hover:!text-white">
+        {title}
+      </h4>
+      <p className="text-sm mt-1 text-gray-700 dark:text-yellow-300 group-hover:!text-white/90">
+        {desc}
+      </p>
+    </div>
+  </a>
+);
+
 export const CeloHero = ({
   title = "Build for the Real World on Celo",
   subtitle = "Build your first app on Celo. No coding experience required.",
@@ -26,20 +80,7 @@ export const CeloHero = ({
             className="group inline-flex items-center gap-2 mt-4 text-[#476520] dark:text-yellow-300 font-semibold hover:underline"
           >
             <span className="text-lg">{ctaText}</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              className="w-5 h-5 transition-transform group-hover:translate-x-0.5"
-              fill="none"
-            >
-              <path
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-              />
-            </svg>
+            <ArrowIcon className="w-5 h-5 transition-transform group-hover:translate-x-0.5" />
           </a>
 
           <p className="mt-4 max-w-xl text-base text-gray-700 dark:text-gray-300">{subtitle}</p>
@@ -134,20 +175,7 @@ export const CeloUseCases = ({
 
               <div className="inline-flex items-center gap-2 text-[#476520] dark:text-yellow-300 font-semibold">
                 <span className="text-lg">{item.ctaText}</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  strokeWidth="1.5"
-                  className="w-5 h-5 translate-x-0 group-hover:translate-x-0.5 transition-transform"
-                  fill="none"
-                >
-                  <path
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-                  />
-                </svg>
+                <ArrowIcon className="w-5 h-5 translate-x-0 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
 
@@ -251,20 +279,7 @@ export const CeloDiscoverGrid = ({
               <span className="text-base text-black dark:text-yellow-300 mt-1 pr-8">{item.desc}</span>
 
               {/* Arrow */}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                className="w-5 h-5 absolute bottom-5 right-5 text-[#476520] dark:text-yellow-300"
-                fill="none"
-              >
-                <path
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-                />
-              </svg>
+              <ArrowIcon className="w-5 h-5 absolute bottom-5 right-5 text-[#476520] dark:text-yellow-300" />
             </a>
           ))}
         </div>
@@ -378,52 +393,7 @@ export const CeloDeveloperResources = ({
     },
   ],
 }) => {
-  const CardLink = ({ href, external, icon, label, desc }) => (
-    <a
-      href={href}
-      rel={external ? "noopener noreferrer" : undefined}
-      className="
-      group relative flex items-start gap-4
-      px-4 pt-5 pb-4
-      border border-black/15 dark:border-white/15
-      bg-[#FCF6F1] dark:bg-transparent
-      transition-all duration-300
-      hover:!bg-[#476520] hover:!border-[#476520]
-      hover:no-underline
-      min-h-[104px]
-    "
-    >
-      <img
-        src={icon}
-        alt=""
-        className="
-        w-10 h-10 shrink-0
-        transition duration-300
-        group-hover:invert group-hover:brightness-0 group-hover:contrast-200
-      "
-      />
-      <div className="pr-2">
-        <h4
-          className="
-          font-bold 
-          text-gray-900 dark:text-yellow-300
-          group-hover:text-white
-        "
-        >
-          {label}
-        </h4>
-        <p
-          className="
-          text-sm mt-1
-          text-gray-700 dark:text-yellow-300
-          group-hover:text-white/90
-        "
-        >
-          {desc}
-        </p>
-      </div>
-    </a>
-  );
+
 
   return (
     <section className="mt-20 bg-sand dark:bg-fig text-gray-900 dark:text-white">
@@ -444,7 +414,15 @@ export const CeloDeveloperResources = ({
 
               <div className="space-y-6">
                 {col.links.map((l, j) => (
-                  <CardLink key={j} {...l} />
+                  <IconCard
+                    key={j}
+                    href={l.href}
+                    external={l.external}
+                    icon={l.icon}
+                    title={l.label}
+                    desc={l.desc}
+                    className="bg-[#FCF6F1] dark:bg-transparent"
+                  />
                 ))}
               </div>
             </div>
@@ -503,34 +481,7 @@ export const CeloBuilderEcosystem = ({
     },
   ],
 }) => {
-  const EcosystemCard = ({ href, external, icon, title, desc }) => (
-    <a
-      href={href}
-      rel={external ? "noopener noreferrer" : undefined}
-      className="
-      group flex items-start gap-4 mt-8 px-4 pt-5 pb-4
-      bg-gypsum dark:bg-fig
-      border border-black/15 dark:border-white/15
-      transition-all duration-300 ease-in-out
-      hover:!bg-[#476520] hover:!border-[#476520]
-      hover:no-underline cursor-pointer
-    "
-    >
-      <img
-        src={icon}
-        alt=""
-        className="
-        w-10 h-10 shrink-0
-        transition duration-300
-        group-hover:invert group-hover:brightness-0 group-hover:contrast-200
-      "
-      />
-      <div className="pr-2">
-        <h4 className="font-bold text-gray-900 dark:text-yellow-300 group-hover:!text-white">{title}</h4>
-        <p className="text-sm  text-gray-900 dark:text-yellow-300 group-hover:!text-white/90 mt-1">{desc}</p>
-      </div>
-    </a>
-  );
+
   return (
     <section className="mt-12 bg-transparent text-gray-900 dark:text-white mb-10">
       <div className="max-w-[1400px] mx-auto px-2 mb-10">
@@ -539,7 +490,11 @@ export const CeloBuilderEcosystem = ({
 
         <div className="grid md:grid-cols-2 grid-cols-1 gap-x-6 gap-y-4 w-full mt-2">
           {items.map((it, i) => (
-            <EcosystemCard key={i} {...it} />
+            <IconCard
+              key={i}
+              {...it}
+              className="mt-8 bg-gypsum dark:bg-fig cursor-pointer"
+            />
           ))}
         </div>
       </div>
