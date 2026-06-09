@@ -4,3 +4,8 @@ node_modules/
 .DS_Store
 yarn-error.log
 yarn-debug.log*
+
+# Environment files (may contain secrets)
+.env
+.env.*
+!.env.example
