@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Hide scrollbar on mobile for app-like feel */
+  body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  body::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Prevent pull-to-refresh on mobile */
+  html {
+    overscroll-behavior: none;
+  }
+
+  /* Safe area padding utility */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Smooth transitions for app-like feel */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Google Maps autocomplete dropdown z-index fix */
+  .pac-container {
+    z-index: 9999 !important;
+    border-radius: 12px !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+    margin-top: 4px !important;
+    font-family: inherit !important;
+  }
+
+  .pac-item {
+    padding: 10px 16px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    border-top: 1px solid #f3f4f6 !important;
+  }
+
+  .pac-item:first-child {
+    border-top: none !important;
+  }
+
+  .pac-item:hover {
+    background: #f9fafb !important;
+  }
+
+  .pac-item-query {
+    font-size: 14px !important;
+  }
+
+  /* Dark mode for maps autocomplete */
+  .dark .pac-container {
+    background: #111827 !important;
+    border-color: #374151 !important;
+  }
+
+  .dark .pac-item {
+    color: #e5e7eb !important;
+    border-top-color: #1f2937 !important;
+  }
+
+  .dark .pac-item:hover {
+    background: #1f2937 !important;
+  }
+
+  .dark .pac-item-query {
+    color: #f9fafb !important;
+  }
+}
+
+@layer utilities {
+  /* PWA standalone mode detection */
+  @media (display-mode: standalone) {
+    .pwa-standalone\:hidden {
+      display: none;
+    }
+    .pwa-standalone\:block {
+      display: block;
+    }
+  }
+}
