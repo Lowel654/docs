@@ -100,8 +100,8 @@ export const NodeArgsTable = ({ parent, name, useBetaAPI }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: `
-          query {
-            __type(name: "${parent}") {
+          query GetType($typeName: String!) {
+            __type(name: $typeName) {
               ...FullType
             }
           }
@@ -155,7 +155,8 @@ export const NodeArgsTable = ({ parent, name, useBetaAPI }) => {
               }
             }
           }
-        `})
+        `,
+          variables: { typeName: parent }})
       })
         .then((result) => result.json())
         .then((data) => setData(data))
@@ -193,8 +194,8 @@ const metadataBetaUrl = 'https://metadata.cloud.getdbt.com/beta/graphql'
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: `
-          query {
-            __type(name: "${nodeName}") {
+          query GetType($typeName: String!) {
+            __type(name: $typeName) {
               ...FullType
             }
           }
@@ -245,7 +246,8 @@ const metadataBetaUrl = 'https://metadata.cloud.getdbt.com/beta/graphql'
               }
             }
           }
-        `}),
+        `,
+          variables: { typeName: nodeName }}),
       })
         .then((result) => result.json())
         .then((data) => setData(data))

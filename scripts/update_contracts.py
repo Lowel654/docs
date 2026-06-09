@@ -169,7 +169,8 @@ def get_l1_contracts(network: str) -> str:
         for filename, url in net["files"].items():
             urlretrieve(url, tmppath / filename)
 
-        l1 = json.load(open(tmppath / "contracts-l1.json"))
+        with open(tmppath / "contracts-l1.json") as fh:
+            l1 = json.load(fh)
 
         for contract, address in l1.items():
             if address == ZERO_ADDRESS:
