@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Optional
+from urllib.error import URLError
 from urllib.request import urlretrieve
 
 API_KEY = os.getenv("ALCHEMY_API_KEY")
@@ -146,7 +147,14 @@ def csv_to_markdown(csv_text: str, network: str) -> str:
 
 def token_csv_to_markdown(csv_text: str, network: str) -> str:
     reader = csv.DictReader(io.StringIO(csv_text))
-    sorted_rows = sorted(reader, key=lambda row: row["Symbol"].lower())
+    rows = list(reader)
+    for row in rows:
+        if "Symbol" not in row:
+            sys.exit(
+                f"Error: CSV for {network} is missing the 'Symbol' column. "
+                f"Available columns: {list(row.keys())}"
+            )
+    sorted_rows = sorted(rows, key=lambda row: row["Symbol"].lower())
     lines = ["| Token | Symbol | Token Address |", "| ----- | ------ | ------------- |"]
     for row in sorted_rows:
         contract = row.get("Name", "").strip()
@@ -167,9 +175,26 @@ def get_l1_contracts(network: str) -> str:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
         for filename, url in net["files"].items():
-            urlretrieve(url, tmppath / filename)
+            try:
+                urlretrieve(url, tmppath / filename)
+            except (URLError, OSError) as e:
+                sys.exit(
+                    f"Error: failed to download {filename} for {network} "
+                    f"from {url}: {e}"
+                )
 
-        l1 = json.load(open(tmppath / "contracts-l1.json"))
+        contracts_path = tmppath / "contracts-l1.json"
+        try:
+            with open(contracts_path) as fh:
+                l1 = json.load(fh)
+        except json.JSONDecodeError as e:
+            sys.exit(
+                f"Error: failed to parse {contracts_path} for {network}: {e}"
+            )
+        except OSError as e:
+            sys.exit(
+                f"Error: failed to read {contracts_path} for {network}: {e}"
+            )
 
         for contract, address in l1.items():
             if address == ZERO_ADDRESS:
@@ -179,7 +204,15 @@ def get_l1_contracts(network: str) -> str:
             lines.append(f"| {contract} | [`{address}`]({base_url}/address/{address}) |")
 
             if contract.endswith("Proxy"):
-                impl = retrieve_impl(contract, address, net)
+                try:
+                    impl = retrieve_impl(contract, address, net)
+                except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
+                    print(
+                        f"  Warning: failed to resolve implementation for "
+                        f"{contract} ({address}): {e}",
+                        file=sys.stderr,
+                    )
+                    continue
                 if impl is None:
                     print("  No implementation found!")
                     continue
@@ -194,31 +227,42 @@ def bytes32_to_address(b: str) -> str:
         raise ValueError(f"Invalid bytes32: {b}")
     return f"0x{b[26:]}"
 
+def _run_cast(args: list[str], context: str) -> str:
+    """Run a `cast` command and return its stdout, with clear error messages."""
+    try:
+        return subprocess.check_output(
+            ["cast"] + args,
+            encoding="utf-8",
+            stderr=subprocess.PIPE,
+        ).strip()
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"'cast' binary not found in PATH ({context}). "
+            "Please install Foundry: https://getfoundry.sh"
+        )
+    except subprocess.CalledProcessError as e:
+        raise subprocess.CalledProcessError(
+            e.returncode,
+            e.cmd,
+            output=e.output,
+            stderr=f"{context}: {e.stderr.strip() if e.stderr else 'unknown error'}",
+        )
+
+
 def resolve_delegate_proxy(contract, address, net) -> Optional[str]:
+    ctx = f"resolve_delegate_proxy({contract}, {address})"
+
     # compute storage slot for address manager
-    manager_slot = subprocess.check_output(
-        [
-            "cast",
-            "index",
-            "address",
-            address,
-            "1",
-        ],
-        encoding="utf-8",
-    ).strip()
+    manager_slot = _run_cast(
+        ["index", "address", address, "1"],
+        context=f"{ctx}: computing manager slot",
+    )
 
     # load address manager address from storage
-    manager_address = subprocess.check_output(
-        [
-            "cast",
-            "storage",
-            "-r",
-            net["l1_rpc"],
-            address,
-            manager_slot,
-        ],
-        encoding="utf-8",
-    ).strip()
+    manager_address = _run_cast(
+        ["storage", "-r", net["l1_rpc"], address, manager_slot],
+        context=f"{ctx}: reading manager address",
+    )
 
     # if no address manager, return
     if manager_address == ZERO_BYTES32:
@@ -227,33 +271,22 @@ def resolve_delegate_proxy(contract, address, net) -> Optional[str]:
     manager_address = bytes32_to_address(manager_address)
 
     # retrieve implementation address from address manager
-    impl = subprocess.check_output(
+    impl = _run_cast(
         [
-            "cast",
-            "call",
-            "-r",
-            net["l1_rpc"],
-            manager_address,
+            "call", "-r", net["l1_rpc"], manager_address,
             "getAddress(string)(address)",
             f'OVM_{contract.replace("Proxy", "")}',
         ],
-        encoding="utf-8",
-    ).strip()
+        context=f"{ctx}: calling getAddress on manager",
+    )
 
     return impl
 
-def retrieve_impl(contract, address, net) -> tuple[bool, str]:
-    impl = subprocess.check_output(
-        [
-            "cast",
-            "storage",
-            "-r",
-            net["l1_rpc"],
-            address,
-            PROXY_SLOT,
-        ],
-        encoding="utf-8",
-    ).strip()
+def retrieve_impl(contract, address, net) -> Optional[str]:
+    impl = _run_cast(
+        ["storage", "-r", net["l1_rpc"], address, PROXY_SLOT],
+        context=f"retrieve_impl({contract}, {address}): reading proxy slot",
+    )
 
     if impl == ZERO_BYTES32:
         return resolve_delegate_proxy(contract, address, net)
@@ -268,47 +301,69 @@ def main():
             "Error: 'celocli' binary not found. Please install it first: npm install -g @celo/celocli"
         )
 
+    output_files = {
+        "tooling/contracts/core-contracts.mdx": "core contracts",
+        "tooling/contracts/token-contracts.mdx": "token contracts",
+        "tooling/contracts/l1-contracts.mdx": "L1 contracts",
+    }
+    for path in output_files:
+        parent = Path(path).parent
+        if not parent.is_dir():
+            sys.exit(
+                f"Error: output directory '{parent}' does not exist. "
+                "Run this script from the repository root."
+            )
+
     print("Fetching core contract data from celocli...")
-    with Path("tooling/contracts/core-contracts.mdx").open("w") as f:
-        f.write(PAGE_HEADER_CORE_CONTRACTS)
+    try:
+        with Path("tooling/contracts/core-contracts.mdx").open("w") as f:
+            f.write(PAGE_HEADER_CORE_CONTRACTS)
 
-        for network, data in NETWORKS.items():
-            print(f"> Fetching contract data from celocli for {network}...")
+            for network, data in NETWORKS.items():
+                print(f"> Fetching contract data from celocli for {network}...")
 
-            csv_output = fetch_celo_cli_csv(network, "network:contracts")
-            markdown = csv_to_markdown(csv_output, network)
+                csv_output = fetch_celo_cli_csv(network, "network:contracts")
+                markdown = csv_to_markdown(csv_output, network)
 
-            f.write(f"\n\n## {data['display_name']}\n\n")
-            f.write(markdown)
+                f.write(f"\n\n## {data['display_name']}\n\n")
+                f.write(markdown)
+    except OSError as e:
+        sys.exit(f"Error: failed to write core-contracts.mdx: {e}")
 
     print("Fetching token contract data from celocli...")
-    with Path("tooling/contracts/token-contracts.mdx").open("w") as f:
-        f.write(PAGE_HEADER_TOKEN_CONTRACTS)
+    try:
+        with Path("tooling/contracts/token-contracts.mdx").open("w") as f:
+            f.write(PAGE_HEADER_TOKEN_CONTRACTS)
 
-        for network, data in NETWORKS.items():
-            print(
-                f"> Fetching fee currency contract data from celocli for {network}..."
-            )
+            for network, data in NETWORKS.items():
+                print(
+                    f"> Fetching fee currency contract data from celocli for {network}..."
+                )
 
-            csv_output = fetch_celo_cli_csv(network, "network:whitelist")
-            markdown = token_csv_to_markdown(csv_output, network)
+                csv_output = fetch_celo_cli_csv(network, "network:whitelist")
+                markdown = token_csv_to_markdown(csv_output, network)
 
-            f.write(f"\n\n## {data['display_name']}\n\n")
-            f.write(markdown)
+                f.write(f"\n\n## {data['display_name']}\n\n")
+                f.write(markdown)
+    except OSError as e:
+        sys.exit(f"Error: failed to write token-contracts.mdx: {e}")
 
     print("Fetching L1 contract data...")
-    with Path("tooling/contracts/l1-contracts.mdx").open("w") as f:
-        f.write(PAGE_HEADER_L1_CONTRACTS)
+    try:
+        with Path("tooling/contracts/l1-contracts.mdx").open("w") as f:
+            f.write(PAGE_HEADER_L1_CONTRACTS)
 
-        for network, data in NETWORKS.items():
-            print(
-                f"> Fetching l1 contract data for {network}..."
-            )
+            for network, data in NETWORKS.items():
+                print(
+                    f"> Fetching l1 contract data for {network}..."
+                )
 
-            markdown = get_l1_contracts(network)
+                markdown = get_l1_contracts(network)
 
-            f.write(f"\n\n## {data['display_name']}\n\n")
-            f.write(markdown)
+                f.write(f"\n\n## {data['display_name']}\n\n")
+                f.write(markdown)
+    except OSError as e:
+        sys.exit(f"Error: failed to write l1-contracts.mdx: {e}")
 
 
 if __name__ == "__main__":
