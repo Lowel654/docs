@@ -1,0 +1,21 @@
+RewriteEngine On
+
+# Route all API requests to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Security headers
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "DENY"
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+# Prevent directory listing
+Options -Indexes
+
+# Protect .env file
+<Files .env>
+    Order allow,deny
+    Deny from all
+</Files>

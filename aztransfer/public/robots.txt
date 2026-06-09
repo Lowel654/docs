@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://aztransfer.az/sitemap.xml
+
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dispatch/
+Disallow: /driver/
